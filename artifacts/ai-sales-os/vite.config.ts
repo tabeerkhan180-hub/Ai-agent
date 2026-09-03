@@ -53,7 +53,10 @@ export default defineConfig({
   },
   server: {
     port,
-    strictPort: true,
+    // Let Vite select the next available port when the preview worker is restarting.
+    // A strict port causes the entire workspace dev command to exit if an older
+    // process is still releasing the configured port.
+    strictPort: false,
     host: '0.0.0.0',
     allowedHosts: true,
     fs: {
