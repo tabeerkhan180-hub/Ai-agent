@@ -1,0 +1,479 @@
+openapi: 3.1.0
+info:
+  # Do not change the title, if the title changes, the import paths will be broken
+  title: Api
+  version: 0.1.0
+  description: API contract for the AI Sales OS demo workspace
+servers:
+  - url: /api
+    description: Base API path
+tags:
+  - name: health
+    description: Health operations
+  - name: dashboard
+    description: Overview and reporting
+  - name: leads
+    description: Lead discovery and qualification
+  - name: outreach
+    description: Outreach queue and activity
+  - name: settings
+    description: Workspace configuration
+paths:
+  /healthz:
+    get:
+      operationId: healthCheck
+      tags: [health]
+      summary: Health check
+      responses:
+        "200":
+          description: Healthy
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/HealthStatus"
+  /dashboard/summary:
+    get:
+      operationId: getDashboardSummary
+      tags: [dashboard]
+      summary: Get dashboard summary
+      responses:
+        "200":
+          description: Dashboard summary
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DashboardSummary"
+  /dashboard/activity:
+    get:
+      operationId: getActivityFeed
+      tags: [dashboard]
+      summary: Get recent activity
+      parameters:
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Recent activity
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/ActivityItem"
+  /leads:
+    get:
+      operationId: listLeads
+      tags: [leads]
+      summary: List leads
+      parameters:
+        - name: status
+          in: query
+          schema:
+            type: string
+        - name: tier
+          in: query
+          schema:
+            type: string
+        - name: search
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Leads
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/Lead"
+    post:
+      operationId: discoverLeads
+      tags: [leads]
+      summary: Discover demo leads
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadDiscoveryInput"
+      responses:
+        "201":
+          description: Discovery result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/DiscoveryResult"
+  /leads/{leadId}:
+    get:
+      operationId: getLead
+      tags: [leads]
+      summary: Get lead detail
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      responses:
+        "200":
+          description: Lead detail
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/LeadDetail"
+        "404":
+          description: Lead not found
+    patch:
+      operationId: updateLead
+      tags: [leads]
+      summary: Update lead status
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/LeadUpdate"
+      responses:
+        "200":
+          description: Updated lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+  /leads/{leadId}/audit:
+    post:
+      operationId: auditLead
+      tags: [leads]
+      summary: Run a website audit
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      responses:
+        "200":
+          description: Audit result
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Audit"
+  /leads/{leadId}/qualify:
+    post:
+      operationId: qualifyLead
+      tags: [leads]
+      summary: Qualify a lead
+      parameters:
+        - $ref: "#/components/parameters/LeadId"
+      responses:
+        "200":
+          description: Qualified lead
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/Lead"
+  /outreach:
+    get:
+      operationId: listOutreach
+      tags: [outreach]
+      summary: List outreach messages
+      parameters:
+        - name: state
+          in: query
+          schema:
+            type: string
+        - $ref: "#/components/parameters/Limit"
+      responses:
+        "200":
+          description: Outreach messages
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  $ref: "#/components/schemas/OutreachMessage"
+    post:
+      operationId: queueOutreach
+      tags: [outreach]
+      summary: Queue a demo outreach message
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/OutreachInput"
+      responses:
+        "201":
+          description: Queued message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachMessage"
+  /outreach/{messageId}/send:
+    post:
+      operationId: sendOutreach
+      tags: [outreach]
+      summary: Send a queued demo message
+      parameters:
+        - name: messageId
+          in: path
+          required: true
+          schema:
+            type: string
+      responses:
+        "200":
+          description: Sent message
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/OutreachMessage"
+  /settings:
+    get:
+      operationId: getSettings
+      tags: [settings]
+      summary: Get workspace settings
+      responses:
+        "200":
+          description: Settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceSettings"
+    patch:
+      operationId: updateSettings
+      tags: [settings]
+      summary: Update workspace settings
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              $ref: "#/components/schemas/SettingsUpdate"
+      responses:
+        "200":
+          description: Updated settings
+          content:
+            application/json:
+              schema:
+                $ref: "#/components/schemas/WorkspaceSettings"
+components:
+  parameters:
+    Limit:
+      name: limit
+      in: query
+      schema:
+        type: integer
+        minimum: 1
+        maximum: 100
+        default: 20
+    LeadId:
+      name: leadId
+      in: path
+      required: true
+      schema:
+        type: string
+  schemas:
+    HealthStatus:
+      type: object
+      required: [status]
+      properties:
+        status:
+          type: string
+    DashboardSummary:
+      type: object
+      required: [leads, pipeline, outreach, integrations, funnel]
+      properties:
+        leads:
+          type: object
+          required: [total, qualified, hot, newThisWeek]
+          properties:
+            total: { type: integer }
+            qualified: { type: integer }
+            hot: { type: integer }
+            newThisWeek: { type: integer }
+        pipeline:
+          type: object
+          required: [value, wonValue, openDeals]
+          properties:
+            value: { type: number }
+            wonValue: { type: number }
+            openDeals: { type: integer }
+        outreach:
+          type: object
+          required: [sent, replies, replyRate, queued]
+          properties:
+            sent: { type: integer }
+            replies: { type: integer }
+            replyRate: { type: number }
+            queued: { type: integer }
+        integrations:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationStatus"
+        funnel:
+          type: array
+          items:
+            $ref: "#/components/schemas/FunnelStage"
+    FunnelStage:
+      type: object
+      required: [stage, count, percentage]
+      properties:
+        stage: { type: string }
+        count: { type: integer }
+        percentage: { type: number }
+    ActivityItem:
+      type: object
+      required: [id, type, title, detail, createdAt]
+      properties:
+        id: { type: string }
+        type: { type: string }
+        title: { type: string }
+        detail: { type: string }
+        createdAt: { type: string }
+        leadId: { type: ["string", "null"] }
+        tone: { type: string }
+    IntegrationStatus:
+      type: object
+      required: [key, label, state, detail]
+      properties:
+        key: { type: string }
+        label: { type: string }
+        state: { type: string }
+        detail: { type: string }
+    Lead:
+      type: object
+      required: [id, businessName, category, city, country, website, websiteStatus, source, status, tier, leadScore, opportunityScore, estValue, createdAt]
+      properties:
+        id: { type: string }
+        businessName: { type: string }
+        category: { type: string }
+        city: { type: string }
+        country: { type: string }
+        website: { type: string }
+        websiteStatus: { type: string }
+        publicEmail: { type: string }
+        source: { type: string }
+        status: { type: string }
+        tier: { type: string }
+        leadScore: { type: integer }
+        opportunityScore: { type: integer }
+        estValue: { type: number }
+        lastActivity: { type: ["string", "null"] }
+        createdAt: { type: string }
+    LeadDetail:
+      allOf:
+        - $ref: "#/components/schemas/Lead"
+        - type: object
+          required: [audit, messages, activities]
+          properties:
+            audit:
+              oneOf:
+                - $ref: "#/components/schemas/Audit"
+                - type: "null"
+            messages:
+              type: array
+              items:
+                $ref: "#/components/schemas/OutreachMessage"
+            activities:
+              type: array
+              items:
+                $ref: "#/components/schemas/ActivityItem"
+    LeadDiscoveryInput:
+      type: object
+      required: [niche, city, country]
+      properties:
+        niche: { type: string, minLength: 1 }
+        city: { type: string, minLength: 1 }
+        country: { type: string, minLength: 1 }
+        limit: { type: integer, minimum: 1, maximum: 20, default: 6 }
+    DiscoveryResult:
+      type: object
+      required: [created, duplicates, leads]
+      properties:
+        created: { type: integer }
+        duplicates: { type: integer }
+        leads:
+          type: array
+          items:
+            $ref: "#/components/schemas/Lead"
+    LeadUpdate:
+      type: object
+      properties:
+        status: { type: string }
+        tier: { type: string }
+    Audit:
+      type: object
+      required: [score, reachable, https, mobileViewport, perfScore, seoScore, a11yScore, opportunities, evidence, analyzedAt]
+      properties:
+        score: { type: integer }
+        reachable: { type: boolean }
+        https: { type: boolean }
+        mobileViewport: { type: boolean }
+        perfScore: { type: ["integer", "null"] }
+        seoScore: { type: integer }
+        a11yScore: { type: integer }
+        opportunities:
+          type: array
+          items:
+            type: object
+            required: [title, rationale]
+            properties:
+              title: { type: string }
+              rationale: { type: string }
+        evidence:
+          type: array
+          items:
+            type: object
+            required: [label, observed]
+            properties:
+              label: { type: string }
+              observed: { type: string }
+        analyzedAt: { type: string }
+    OutreachMessage:
+      type: object
+      required: [id, leadId, leadName, toAddress, subject, body, state, sequenceStep, queuedAt, sentAt]
+      properties:
+        id: { type: string }
+        leadId: { type: string }
+        leadName: { type: string }
+        toAddress: { type: string }
+        subject: { type: string }
+        body: { type: string }
+        state: { type: string }
+        sequenceStep: { type: integer }
+        queuedAt: { type: string }
+        sentAt: { type: ["string", "null"] }
+    OutreachInput:
+      type: object
+      required: [leadId]
+      properties:
+        leadId: { type: string }
+        subject: { type: string }
+        body: { type: string }
+    WorkspaceSettings:
+      type: object
+      required: [runMode, approvalMode, dailySendLimit, perDomainDaily, sendWindow, targetNiches, targetCities, currency, integrations]
+      properties:
+        runMode: { type: string }
+        approvalMode: { type: boolean }
+        dailySendLimit: { type: integer }
+        perDomainDaily: { type: integer }
+        sendWindow: { type: string }
+        targetNiches:
+          type: array
+          items: { type: string }
+        targetCities:
+          type: array
+          items: { type: string }
+        currency: { type: string }
+        integrations:
+          type: array
+          items:
+            $ref: "#/components/schemas/IntegrationStatus"
+    SettingsUpdate:
+      type: object
+      properties:
+        approvalMode: { type: boolean }
+        dailySendLimit: { type: integer, minimum: 1, maximum: 500 }
+        perDomainDaily: { type: integer, minimum: 1, maximum: 10 }
+        targetNiches:
+          type: array
+          items: { type: string }
+        targetCities:
+          type: array
+          items: { type: string }

@@ -1,0 +1,28 @@
+kind = "web"
+previewPath = "/"
+title = "AI Sales OS"
+description = "A demo-first sales operations workspace for discovering qualified local businesses, auditing their web presence, personalizing outreach, and guiding warm leads to human follow-up without autonomous closing."
+version = "1.0.0"
+id = "artifacts/ai-sales-os"
+router = "path"
+
+[[services]]
+name = "web"
+paths = [ "/" ]
+localPort = 25971
+
+[services.development]
+run = "pnpm --filter @workspace/ai-sales-os run dev"
+
+[services.production]
+build = [ "pnpm", "--filter", "@workspace/ai-sales-os", "run", "build" ]
+serve = "static"
+publicDir = "artifacts/ai-sales-os/dist/public"
+
+[[services.production.rewrites]]
+from = "/*"
+to = "/index.html"
+
+[services.env]
+PORT = "25971"
+BASE_PATH = "/"

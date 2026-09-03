@@ -1,0 +1,25 @@
+[build]
+  command = "pnpm --filter @workspace/ai-sales-os run build"
+  publish = "artifacts/ai-sales-os/dist/public"
+  functions = "netlify/functions"
+
+[build.environment]
+  NODE_VERSION = "20"
+  NODE_ENV = "production"
+  PORT = "4173"
+  BASE_PATH = "/"
+
+[functions]
+  node_bundler = "esbuild"
+  external_node_modules = ["express"]
+
+[[redirects]]
+  from = "/api/*"
+  to = "/.netlify/functions/api/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/*"
+  to = "/index.html"
+  status = 200

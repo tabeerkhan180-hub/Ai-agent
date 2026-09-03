@@ -1,0 +1,51 @@
+import { FormEvent, useState } from 'react';
+import { Link } from 'wouter';
+import { useQueryClient } from '@tanstack/react-query';
+import { ArrowUpRight, ChevronDown, Filter, MapPin, Plus, Search, Sparkles, Target, X } from 'lucide-react';
+import { getGetDashboardSummaryQueryKey, getListLeadsQueryKey, useDiscoverLeads, useListLeads, useUpdateLead } from '@workspace/api-client-react';
+import type { Lead } from '@workspace/api-client-react';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
+import { EmptyState, ErrorState, PageHeader, SectionLabel, SkeletonBlock } from '@/components/shell';
+
+const statusStyles: Record<string, string> = { new: 'bg-[#eef0f4] text-[#59677c]', qualified: 'bg-[#e5f2ed] text-[#287660]', hot: 'bg-[#fff0da] text-[#a66a13]', contacted: 'bg-[#e9e8f5] text-[#5d5791]' };
+const statusLabel = (s: string) => s.replaceAll('_', ' ');
+
+export default function LeadsPage() {
+  const [search, setSearch] = useState('');
+  const [query, setQuery] = useState('');
+  const [tier, setTier] = useState('');
+  const [showDiscover, setShowDiscover] = useState(false);
+  const leads = useListLeads({ search: query || undefined, tier: tier || undefined, limit: 100 });
+  const discover = useDiscoverLeads();
+  const update = useUpdateLead();
+  const qc = useQueryClient();
+  const submitSearch = (e: FormEvent) => { e.preventDefault(); setQuery(search); };
+  const qualify = (lead: Lead) => update.mutate({ leadId: lead.id, data: { status: 'qualified', tier: lead.tier } }, { onSuccess: () => { qc.invalidateQueries({ queryKey: getListLeadsQueryKey({ search: query || undefined, tier: tier || undefined, limit: 100 }) }); qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); } });
+  return <div>
+    <PageHeader eyebrow="Lead intelligence · 01" title="Lead workspace" description="Find the overlooked businesses with enough signal to deserve a thoughtful first touch.">
+      <Button onClick={() => setShowDiscover(true)} className="h-10 rounded-lg bg-primary px-4 text-xs font-bold" data-testid="button-open-discover"><Plus className="h-4 w-4" />Discover businesses</Button>
+    </PageHeader>
+    <div className="mb-5 flex flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-sm md:flex-row"><form onSubmit={submitSearch} className="relative flex-1"><Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" /><Input value={search} onChange={e => setSearch(e.target.value)} placeholder="Search business, city, or domain..." className="h-10 border-0 bg-muted/60 pl-10 shadow-none focus-visible:ring-1" data-testid="input-search-leads" /></form><div className="flex gap-2"><select value={tier} onChange={e => { setTier(e.target.value); }} className="h-10 rounded-lg border border-border bg-card px-3 text-xs font-semibold outline-none focus:ring-1 focus:ring-ring" data-testid="select-tier-filter"><option value="">All tiers</option><option value="A">Tier A</option><option value="B">Tier B</option><option value="C">Tier C</option></select><Button onClick={() => { setQuery(search); }} variant="secondary" className="h-10 px-3 text-xs" data-testid="button-apply-filters"><Filter className="h-3.5 w-3.5" />Filter</Button></div></div>
+    <div className="mb-4 flex items-center justify-between"><SectionLabel>{leads.data?.length ?? 0} businesses in view</SectionLabel><div className="flex items-center gap-1 text-[11px] text-muted-foreground">Sorted by opportunity <ChevronDown className="h-3 w-3" /></div></div>
+    {leads.isLoading ? <div className="space-y-2">{[1,2,3,4,5].map(i => <SkeletonBlock key={i} className="h-[86px]" />)}</div> : leads.isError ? <ErrorState retry={() => leads.refetch()} /> : leads.data?.length ? <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm"><div className="hidden grid-cols-[2fr_1fr_1fr_.7fr_.7fr_1fr] gap-4 border-b border-border bg-muted/40 px-5 py-3 font-mono-ui text-[9px] uppercase tracking-[.16em] text-muted-foreground lg:grid"><span>Business</span><span>Location</span><span>Website</span><span>Signal</span><span>Value</span><span>Action</span></div>{leads.data.map((lead, i) => <LeadRow key={lead.id} lead={lead} index={i} onQualify={() => qualify(lead)} qualifying={update.isPending && update.variables?.leadId === lead.id} />)}</div> : <EmptyState title="No businesses in view" detail="Try a broader search, or discover a new pocket of local businesses." action={<Button onClick={() => setShowDiscover(true)} data-testid="button-empty-discover"><Sparkles className="h-4 w-4" />Discover a pocket</Button>} />}
+    {showDiscover && <DiscoverDialog onClose={() => setShowDiscover(false)} mutation={discover} onDone={() => { setShowDiscover(false); qc.invalidateQueries({ queryKey: getListLeadsQueryKey() }); qc.invalidateQueries({ queryKey: getGetDashboardSummaryQueryKey() }); }} />}
+  </div>;
+}
+
+function LeadRow({ lead, index, onQualify, qualifying }: { lead: Lead; index: number; onQualify: () => void; qualifying: boolean }) {
+  return <div className={`grid gap-3 border-b border-border/70 px-4 py-4 transition hover:bg-muted/35 md:px-5 lg:grid-cols-[2fr_1fr_1fr_.7fr_.7fr_1fr] lg:items-center ${index < 3 ? 'animate-in-up' : ''}`} style={{ animationDelay: `${index * 45}ms` }} data-testid={`row-lead-${lead.id}`}>
+    <div className="flex min-w-0 items-center gap-3"><div className="grid h-9 w-9 shrink-0 place-items-center rounded-lg bg-[#e9e8f5] font-display text-sm font-bold text-[#58577f]">{lead.businessName.slice(0, 1)}</div><div className="min-w-0"><Link href={`/leads/${lead.id}`} className="truncate text-sm font-bold hover:text-[#92701d]" data-testid={`link-lead-${lead.id}`}>{lead.businessName}</Link><p className="mt-0.5 truncate text-[11px] text-muted-foreground">{lead.category} <span className="text-border">·</span> {lead.source}</p></div></div>
+    <div className="flex items-center gap-1.5 text-xs text-muted-foreground"><MapPin className="h-3.5 w-3.5 text-muted-foreground/60" />{lead.city}, {lead.country}</div>
+    <div className="flex items-center gap-2 text-xs text-muted-foreground"><span className={`h-1.5 w-1.5 rounded-full ${lead.websiteStatus === 'live' ? 'bg-emerald-500' : 'bg-[#e58a67]'}`} />{lead.website.replace(/^https?:\/\//, '').replace(/\/$/, '')}</div>
+    <div><span className={`inline-flex rounded-full px-2 py-1 font-mono-ui text-[10px] font-medium ${statusStyles[lead.status] ?? statusStyles.new}`}>{statusLabel(lead.status)}</span><p className="mt-1 font-mono-ui text-[10px] text-muted-foreground">{lead.leadScore}/100 fit</p></div>
+    <p className="font-mono-ui text-xs font-medium">{new Intl.NumberFormat('en-US', { style: 'currency', currency: 'USD', maximumFractionDigits: 0 }).format(lead.estValue)}</p>
+    <div className="flex gap-2"><Link href={`/leads/${lead.id}`} className="inline-flex h-8 items-center gap-1 rounded-md border border-border px-2.5 text-[11px] font-bold hover:bg-muted" data-testid={`link-review-${lead.id}`}>Review <ArrowUpRight className="h-3 w-3" /></Link>{lead.status === 'new' && <button onClick={onQualify} disabled={qualifying} className="h-8 rounded-md bg-[#e7b34c] px-2.5 text-[11px] font-bold text-[#182338] disabled:opacity-50" data-testid={`button-qualify-${lead.id}`}>{qualifying ? '...' : 'Qualify'}</button>}</div>
+  </div>;
+}
+
+function DiscoverDialog({ onClose, mutation, onDone }: { onClose: () => void; mutation: ReturnType<typeof useDiscoverLeads>; onDone: () => void }) {
+  const [niche, setNiche] = useState('independent coffee shops'); const [city, setCity] = useState('Brooklyn'); const [country, setCountry] = useState('US'); const [limit, setLimit] = useState('8');
+  const submit = (e: FormEvent) => { e.preventDefault(); mutation.mutate({ data: { niche, city, country, limit: Number(limit) } }, { onSuccess: onDone }); };
+  return <div className="fixed inset-0 z-50 flex items-center justify-center bg-[#182338]/45 p-4 backdrop-blur-sm"><div className="w-full max-w-md rounded-2xl border border-border bg-card p-6 shadow-2xl animate-in-up"><div className="flex items-start justify-between"><div><p className="font-mono-ui text-[10px] uppercase tracking-[.18em] text-[#92701d]">New discovery run</p><h2 className="mt-2 font-display text-2xl font-bold">Find your next pocket.</h2><p className="mt-1 text-xs leading-5 text-muted-foreground">Safe demo data only. No external directory calls are made.</p></div><button onClick={onClose} data-testid="button-close-discover"><X className="h-5 w-5 text-muted-foreground" /></button></div><form onSubmit={submit} className="mt-6 space-y-4"><label className="block text-xs font-bold">Niche<Input value={niche} onChange={e => setNiche(e.target.value)} className="mt-1.5" required data-testid="input-discover-niche" /></label><div className="grid gap-4 sm:grid-cols-[1fr_.42fr]"><label className="block text-xs font-bold">City<Input value={city} onChange={e => setCity(e.target.value)} className="mt-1.5" required data-testid="input-discover-city" /></label><label className="block text-xs font-bold">Country<Input value={country} onChange={e => setCountry(e.target.value)} className="mt-1.5" required data-testid="input-discover-country" /></label></div><label className="block text-xs font-bold">Businesses to add<select value={limit} onChange={e => setLimit(e.target.value)} className="mt-1.5 h-9 w-full rounded-md border border-input bg-transparent px-3 text-sm" data-testid="select-discover-limit"><option value="5">5 businesses</option><option value="8">8 businesses</option><option value="12">12 businesses</option></select></label><div className="flex justify-end gap-2 pt-2"><Button type="button" variant="outline" onClick={onClose} data-testid="button-cancel-discover">Cancel</Button><Button type="submit" disabled={mutation.isPending} className="bg-primary" data-testid="button-run-discover">{mutation.isPending ? 'Mapping pocket...' : 'Run discovery'}<ArrowUpRight className="h-4 w-4" /></Button></div>{mutation.isError && <p className="text-xs text-destructive">Discovery failed. Try again.</p>}</form></div></div>;
+}
